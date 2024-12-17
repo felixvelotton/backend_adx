@@ -9,142 +9,111 @@ app.use(express.json());
 app.use(cors());
 app.use(bodyparser.json());
 
-var conString = config.urlConnection;
-var client = new Client(conString);
+const conString = config.urlConnection;
+const client = new Client(conString);
 
+// Conexão com o banco de dados
 client.connect((err) => {
     if (err) {
-        return console.error('Não foi possível conectar ao banco.', err);
+        return console.error("Não foi possível conectar ao banco.", err);
     }
-    client.query('SELECT NOW()', (err, result) => {
-        if (err) {
-            return console.error('Erro ao executar a query.', err);
-        }
-        console.log(result.rows[0]);
-    });
+    console.log("Conectado ao banco de dados PostgreSQL");
 });
-
+// Rota de Teste
 app.get("/", (req, res) => {
     console.log("Response ok.");
     res.send("Ok – Servidor disponível.");
 });
 
-app.get("/usuarios", (req, res) => {
-    try {
-        client.query("SELECT * FROM Usuarios",// query = pesquisa
-            (err, result) => {
-                if (err) {
-                    return console.error("Erro ao executar a qry de SELECT", err);
-                }
-                res.send(result.rows);
-                console.log("Rota: get usuarios");
-            });
-    } catch (error) {
-        console.log(error);
-    }
+// Rota GET: Buscar todos os cadastros
+app.get("/cadastros", (req, res) => {
+    client.query("SELECT * FROM Cadastro", (err, result) => {
+        if (err) {
+            console.error("Erro ao executar a query SELECT", err);
+            res.status(500).send("Erro ao buscar os dados.");
+        } else {
+            res.json(result.rows);
+            console.log("Rota: GET /cadastros");
+        }
+    });
 });
-// slide 22:
+// Rota GET: Buscar um cadastro específico por ID
+app.get("/cadastros/:id", (req, res) => {
+    const { id } = req.params;
+    client.query("SELECT * FROM Cadastro WHERE id = $1", [id], (err, result) => {
+        if (err) {
+            console.error("Erro ao executar a query SELECT ID", err);
+            return res.status(500).send("Erro ao buscar o cadastro.");
+        }
+        if (result.rowCount === 0) {
+            res.status(404).send(`Nenhum cadastro encontrado para o ID: ${id}`);
+        } else {
+            res.json(result.rows[0]);
+        }
+    });
+});
 
-app.get("/usuarios/:id", (req, res) => { // 
-    try {
-        console.log("Rota: usuarios/" + req.params.id);
-        client.query(
-            "SELECT * FROM Usuarios WHERE id = $1", [req.params.id],
-            (err, result) => {
-                if (err) {
-                    res.send("O dado: " + req.params.id + "informado, NÂO é valido1");
-                    return console.error("Erro ao executar a qry de SELECT id", err);
-                }
-                if (result.rowCount == 0) {
-                    res.send("NÃO há usuario para o codigo: " + req.params.id);
-                } else {
-                    res.send(result.rows);
-                }
-                res.send(result.rows);
-                //console.log(result);
+// Rota POST: Criar um novo cadastro
+app.post("/cadastros", (req, res) => {
+    const { nome, email, celular } = req.body;
+
+    client.query(
+        "INSERT INTO Cadastro (nome, email, celular) VALUES ($1, $2, $3) RETURNING *",
+        [nome, email, celular],
+        (err, result) => {
+            if (err) {
+                console.error("Erro ao executar a query INSERT", err);
+                return res.status(500).send("Erro ao inserir o cadastro.");
             }
-        );
-    } catch (error) {
-        console.log(error);
-    }
+            res.status(201).json(result.rows[0]);
+            console.log("Novo cadastro adicionado:", result.rows[0]);
+        }
+    );
 });
+// Rota PUT: Atualizar um cadastro por ID
+app.put("/cadastros/:id", (req, res) => {
+    const { id } = req.params;
+    const { nome, email, celular } = req.body;
 
-app.delete("/usuarios/:id", (req, res) => {
-    try {
-        console.log("Rota: delete/" + req.params.id);
-        client.query(
-            "DELETE FROM Usuarios WHERE id = $1", [req.params.id],
-            (err, result) => {
-                if (err) {
-                    res.send("O dado: +" + req.params.id + "informado, NÃO é valido");
-                    return console.error("Erro ao executar a qry de DELETE", err);
-                } else {
-                    if (result.rowCount == 0) {
-                        res.status(404).json({ info: "Registro não encontrado." });
-                    } else {
-                        res.status(200).json({ info: `Registro excluído. Código: ${req.params.id}` });
-                    }
-                }
-                console.log(result);
+    client.query(
+        "UPDATE Cadastro SET nome = $1, email = $2, celular = $3 WHERE id = $4 RETURNING *",
+        [nome, email, celular, id],
+        (err, result) => {
+            if (err) {
+                console.error("Erro ao executar a query UPDATE", err);
+                return res.status(500).send("Erro ao atualizar o cadastro.");
             }
-        );
-    } catch (error) {
-        console.log(error);
-    }
-});
-// metodo POST
-
-app.post("/usuarios", (req, res) => {
-    try {
-
-        console.log("Alguém enviou um post com os dados:", req.body);
-        const { nome, email, altura, peso } = req.body;
-        
-        client.query(
-            "INSERT INTO Usuarios (nome, email, altura, peso) VALUES ($1, $2, $3, $4) RETURNING *", 
-            [nome, email, altura, peso],
-            (err, result) => {
-                if (err) {
-                    console.error("Erro ao executar a qry de INSERT", err);
-                    return res.status(500).json({ error: "Erro ao inserir usuário" });
-                }
-                
-                const { id } = result.rows[0];
-                res.setHeader("id", `${id}`);
-                res.status(201).json(result.rows[0]);
-                console.log(result);
+            if (result.rowCount === 0) {
+                res.status(404).send(`Nenhum cadastro encontrado para o ID: ${id}`);
+            } else {
+                res.status(200).json(result.rows[0]);
+                console.log("Cadastro atualizado:", result.rows[0]);
             }
-        );
-    } catch (erro) {
-        console.error(erro);
-        res.status(500).json({ error: "Erro interno do servidor" });
-    }
+        }
+    );
 });
-// metodo PUT
-app.put("/usuarios/:id", (req, res) => {
-try {
-console.log("Alguém enviou um update com os dados:", req.body);
-const id = req.params.id;
-const { nome, email, altura, peso } = req.body;
-client.query(
-"UPDATE Usuarios SET nome=$1, email=$2, altura=$3, peso=$4 WHERE id =$5 ",
-[nome, email, altura, peso, id],
-(err, result) => {
-if (err) {
-return console.error("Erro ao executar a qry de UPDATE", err);
-} else {
-res.setHeader("id", id);
-res.status(202).json({ "identificador": id });
-console.log(result);
-}
-}
-);
-} catch (erro) {
-console.error(erro);
-}
+
+// Rota DELETE: Deletar um cadastro por ID
+app.delete("/cadastros/:id", (req, res) => {
+    const { id } = req.params;
+
+    client.query("DELETE FROM Cadastro WHERE id = $1 RETURNING *", [id], (err, result) => {
+        if (err) {
+            console.error("Erro ao executar a query DELETE", err);
+            return res.status(500).send("Erro ao deletar o cadastro.");
+        }
+        if (result.rowCount === 0) {
+            res.status(404).send(`Nenhum cadastro encontrado para o ID: ${id}`);
+        } else {
+            res.status(200).json({ message: `Cadastro ID ${id} deletado com sucesso.` });
+            console.log("Cadastro deletado:", result.rows[0]);
+        }
+    });
 });
-// o metodo listen debe ser o ultimo da api
-app.listen(config.port, () =>
-    console.log("Servidor funcionando na porta " + config.port)
-);
+
+// O método listen deve ser o último da API
+app.listen(config.port, () => {
+    console.log(`Servidor funcionando na porta ${config.port}`);
+});
+
 module.exports = app;
