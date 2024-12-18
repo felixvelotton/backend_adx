@@ -13,8 +13,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Configuração do banco de dados PostgreSQL
+
 const client = new Client({
-  connectionString: config.urlConnection, // String de conexão vinda do arquivo config.js
+  connectionString: config.urlConnection,
+  ssl: {
+    rejectUnauthorized: false, // Necessário para Vercel e NeonDB
+  },
 });
 
 // Conexão com o banco de dados
