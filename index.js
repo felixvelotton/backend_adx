@@ -11,13 +11,7 @@ const PORT = config.port || 3000; // Porta padrão caso não tenha configuraçã
 app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
-const cors = require("cors");
 
-app.use(cors({
-  origin: "https://frontend-adx.vercel.app", // Substitua com o URL do frontend
-  methods: ["GET", "POST", "PUT", "DELETE"], // Permite todos os métodos HTTP necessários
-  allowedHeaders: ["Content-Type"]
-}));
 // Configuração do banco de dados PostgreSQL
 
 const client = new Client({
